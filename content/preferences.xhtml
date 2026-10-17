@@ -1,0 +1,104 @@
+<vbox id="zotero-mcp-prefs"
+      xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+      xmlns:html="http://www.w3.org/1999/xhtml">
+
+	<groupbox>
+		<label><html:h2>MCP server</html:h2></label>
+		<html:p class="zmcp-description">
+			Agents connect to Zotero over MCP (Streamable HTTP) on this computer only. Every request needs the token.
+		</html:p>
+
+		<html:label class="zmcp-field-label" for="zmcp-endpoint">Endpoint</html:label>
+		<html:input id="zmcp-endpoint" type="text" readonly="true" class="zmcp-wide"/>
+
+		<html:label class="zmcp-field-label" for="zmcp-token">Token</html:label>
+		<hbox align="center" class="zmcp-row">
+			<html:input id="zmcp-token" type="password" readonly="true" class="zmcp-wide"/>
+			<button id="zmcp-token-show" label="Show"/>
+			<button id="zmcp-token-copy" label="Copy"/>
+			<button id="zmcp-token-regenerate" label="Regenerate…"/>
+		</hbox>
+
+		<html:label class="zmcp-field-label" for="zmcp-command-local">Claude Code, this project only</html:label>
+		<hbox align="start" class="zmcp-row">
+			<html:textarea id="zmcp-command-local" readonly="true" rows="3" class="zmcp-wide zmcp-mono"/>
+			<button id="zmcp-command-local-copy" label="Copy"/>
+		</hbox>
+		<html:p class="zmcp-hint">Run it inside the project folder; Zotero is then available only in Claude Code sessions started there.</html:p>
+
+		<html:label class="zmcp-field-label" for="zmcp-command-user">Claude Code, all projects</html:label>
+		<hbox align="start" class="zmcp-row">
+			<html:textarea id="zmcp-command-user" readonly="true" rows="3" class="zmcp-wide zmcp-mono"/>
+			<button id="zmcp-command-user-copy" label="Copy"/>
+		</hbox>
+		<html:p class="zmcp-hint">
+			Run it once from any folder. Use one of the two, not both: with both, the project entry wins in that folder.
+			Claude Desktop cannot reach local servers directly and needs a local stdio bridge (planned).
+		</html:p>
+	</groupbox>
+
+	<groupbox>
+		<label><html:h2>Tools</html:h2></label>
+		<html:p class="zmcp-description">
+			Switched-off tools are hidden from the agent. An agent that still calls one gets a refusal; the change shows in its tool list from its next session.
+		</html:p>
+		<html:div id="zmcp-tools"/>
+	</groupbox>
+
+	<groupbox>
+		<label><html:h2>Library tree</html:h2></label>
+		<hbox align="center" class="zmcp-row">
+			<html:label for="zmcp-node-limit">Size limit for get_library_tree (collections + placements + files, 0 = no limit)</html:label>
+			<html:input id="zmcp-node-limit" type="number" min="0" step="500" class="zmcp-number"/>
+		</hbox>
+	</groupbox>
+
+	<groupbox>
+		<label><html:h2>Folder sync</html:h2></label>
+		<html:p class="zmcp-description">
+			Mirror the stored files of My Library into a folder tree that follows your collections. Right-click a collection or My Library and choose “Export Files…” for one-off exports.
+		</html:p>
+
+		<html:label class="zmcp-field-label" for="zmcp-sync-path">Global sync folder</html:label>
+		<hbox align="center" class="zmcp-row">
+			<html:input id="zmcp-sync-path" type="text" class="zmcp-wide"
+			            preference="extensions.zotero.zoteromcp.sync.path"/>
+			<button id="zmcp-sync-choose" label="Choose…"/>
+		</hbox>
+
+		<html:label class="zmcp-field-label" for="zmcp-sync-name">Library folder name</html:label>
+		<html:input id="zmcp-sync-name" type="text" class="zmcp-medium"
+		            preference="extensions.zotero.zoteromcp.sync.folderName"/>
+		<html:p id="zmcp-sync-target" class="zmcp-hint"/>
+
+		<radiogroup id="zmcp-sync-mode" preference="extensions.zotero.zoteromcp.sync.mode">
+			<radio value="manual" label="Manual (Sync Now, or the sync_library_folder tool)"/>
+			<radio value="automatic" label="Automatic (30 seconds after changes in the library)"/>
+		</radiogroup>
+
+		<hbox align="center" class="zmcp-row">
+			<button id="zmcp-sync-now" label="Sync Now"/>
+			<button id="zmcp-sync-bib" label="Set Up Bibliography…"/>
+		</hbox>
+		<html:p id="zmcp-sync-report" class="zmcp-hint"/>
+	</groupbox>
+
+	<groupbox>
+		<label><html:h2>Better BibTeX</html:h2></label>
+		<html:p id="zmcp-bbt-status" class="zmcp-description">Checking…</html:p>
+		<hbox align="center" class="zmcp-row">
+			<button id="zmcp-bbt-install" label="Install Better BibTeX" hidden="true"/>
+			<button id="zmcp-bbt-apply" label="Apply Expected Settings" hidden="true"/>
+		</hbox>
+		<html:p id="zmcp-bbt-settings" class="zmcp-hint"/>
+	</groupbox>
+
+	<groupbox>
+		<label><html:h2>Audit log</html:h2></label>
+		<html:p class="zmcp-description">Every executed write is logged with time, tool, keys and before/after values.</html:p>
+		<hbox align="center" class="zmcp-row">
+			<html:input id="zmcp-audit-path" type="text" readonly="true" class="zmcp-wide"/>
+			<button id="zmcp-audit-reveal" label="Show in Folder"/>
+		</hbox>
+	</groupbox>
+</vbox>

@@ -1,0 +1,67 @@
+#zotero-mcp-prefs {
+	max-width: 780px;
+}
+
+#zotero-mcp-prefs groupbox {
+	margin-bottom: 14px;
+}
+
+.zmcp-description {
+	margin: 0 0 8px;
+}
+
+.zmcp-hint {
+	margin: 4px 0 8px;
+	color: var(--fill-secondary, GrayText);
+	font-size: 0.92em;
+}
+
+.zmcp-field-label {
+	display: block;
+	margin: 8px 0 4px;
+	font-weight: 600;
+}
+
+.zmcp-row {
+	gap: 6px;
+	margin: 4px 0;
+}
+
+.zmcp-wide {
+	flex: 1;
+	min-width: 360px;
+}
+
+.zmcp-medium {
+	min-width: 220px;
+}
+
+.zmcp-number {
+	width: 7em;
+}
+
+.zmcp-mono {
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+	font-size: 0.9em;
+	resize: vertical;
+}
+
+.zmcp-tool-group h3 {
+	margin: 10px 0 4px;
+	font-size: 1em;
+}
+
+.zmcp-tool {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 2px 0;
+}
+
+.zmcp-tool code {
+	min-width: 190px;
+}
+
+.zmcp-tool-desc {
+	color: var(--fill-secondary, GrayText);
+}

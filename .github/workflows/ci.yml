@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      online:
+        description: Also run the tests that need online lookups (DOI, ISBN, PMID, arXiv, Find Available PDF)
+        type: boolean
+        default: false
+
+env:
+  ZOTERO_VERSION: "10.0.6"
+  BBT_VERSION: "9.0.71"
+
+jobs:
+  test:
+    name: End-to-end tests (Zotero on Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Zotero's system libraries and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb xauth xz-utils libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libx11-xcb1 libxtst6 libpci3
+
+      - name: Cache Zotero and Better BibTeX downloads
+        uses: actions/cache@v6
+        with:
+          path: ~/zmcp-ci-cache
+          key: zotero-${{ env.ZOTERO_VERSION }}-bbt-${{ env.BBT_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Run end-to-end tests
+        env:
+          # Online lookups depend on external services; run them on demand only
+          NO_NETWORK: ${{ inputs.online && '0' || '1' }}
+        run: scripts/ci-test-linux.sh
+
+      - name: Upload Zotero log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: zotero-test-log
+          path: ${{ runner.temp }}/zmcp-ci/test/zotero.log
+          if-no-files-found: ignore
+
+  build:
+    name: Build XPI
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build
+        run: scripts/build-xpi.sh
+
+      - name: Upload XPI
+        uses: actions/upload-artifact@v7
+        with:
+          name: zotero-mcp-xpi
+          path: dist/zotero-mcp.xpi
+          if-no-files-found: error

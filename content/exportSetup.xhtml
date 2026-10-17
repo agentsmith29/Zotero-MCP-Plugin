@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<?xml-stylesheet href="chrome://global/skin/" type="text/css"?>
+<?xml-stylesheet href="chrome://zotero/skin/zotero.css" type="text/css"?>
+<?xml-stylesheet href="chrome://zotero-platform/content/zotero.css"?>
+<?xml-stylesheet href="chrome://zotero-mcp/content/exportSetup.css" type="text/css"?>
+
+<window
+	xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+	xmlns:html="http://www.w3.org/1999/xhtml"
+	id="zotero-mcp-export-setup"
+	title="Export Files"
+	drawintitlebar-platforms="mac"
+	onload="ZoteroMCP_ExportSetup.init()">
+	<script>
+		Services.scriptloader.loadSubScript("chrome://zotero/content/include.js", this);
+		Services.scriptloader.loadSubScript("chrome://zotero/content/titlebar.js", this);
+		Services.scriptloader.loadSubScript("chrome://zotero/content/customElements.js", this);
+		Services.scriptloader.loadSubScript("chrome://zotero-mcp/content/exportSetup.js", this);
+	</script>
+
+	<dialog id="zotero-mcp-export-dialog" buttons="cancel,accept" buttonlabelaccept="Continue">
+		<vbox class="zmcp-setup" flex="1">
+			<html:p id="zmcp-scope" class="zmcp-scope"/>
+
+			<html:label class="zmcp-label" for="zmcp-folder">Export location</html:label>
+			<hbox align="center" class="zmcp-row">
+				<html:input id="zmcp-folder" type="text" readonly="true" class="zmcp-grow"/>
+				<button id="zmcp-change" label="Change…" oncommand="ZoteroMCP_ExportSetup.changeFolder()"/>
+			</hbox>
+
+			<html:label class="zmcp-label" for="zmcp-name">Folder name</html:label>
+			<html:input id="zmcp-name" type="text" class="zmcp-grow" oninput="ZoteroMCP_ExportSetup.updateTarget()"/>
+			<html:p id="zmcp-target" class="zmcp-hint"/>
+
+			<html:label class="zmcp-label">Structure</html:label>
+			<radiogroup id="zmcp-structure">
+				<radio value="collections" label="Preserve collections (subfolders)"/>
+				<radio value="flat" label="Flat (all files in one folder)"/>
+			</radiogroup>
+
+			<checkbox id="zmcp-bibliography" label="Include bibliography (Better BibTeX)" native="true"/>
+			<html:p id="zmcp-bbt-missing" class="zmcp-hint" hidden="true">Better BibTeX is not available, so no bibliography can be written.</html:p>
+			<html:p class="zmcp-hint">Repeated exports to the same folder update it: only files this export created are replaced or removed; copies you edited are kept as “…_annotated_&lt;date&gt;”.</html:p>
+		</vbox>
+	</dialog>
+</window>

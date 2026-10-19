@@ -1,5 +1,6 @@
 pref("extensions.zotero.zoteromcp.token", "");
 pref("extensions.zotero.zoteromcp.tree.nodeLimit", 5000);
+pref("extensions.zotero.zoteromcp.dates.normalize", true);
 pref("extensions.zotero.zoteromcp.sync.path", "");
 pref("extensions.zotero.zoteromcp.sync.folderName", "My library");
 pref("extensions.zotero.zoteromcp.sync.mode", "manual");

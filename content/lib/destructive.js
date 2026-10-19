@@ -19,6 +19,13 @@ ZoteroMCP.Destructive = (function () {
 		};
 	}
 
+	// Date overrides are kept in Zotero's internal "YYYY-MM-DD text" form; show the text
+	function shown(field, value) {
+		return ZoteroMCP.Dates.isDateField(field) && Zotero.Date.isMultipart(value)
+			? Zotero.Date.multipartToStr(value)
+			: value;
+	}
+
 	function childCounts(item) {
 		if (!item.isRegularItem()) {
 			return { attachments: 0, notes: 0 };
@@ -107,10 +114,15 @@ ZoteroMCP.Destructive = (function () {
 					errors.push(`fields.${field}.from '${choice.from}' is not one of the merged items`);
 					continue;
 				}
-				overrides[field] = source.toJSON()[field] || "";
+				// Date fields keep their internal form so the day/month order survives
+				overrides[field] = ZoteroMCP.Dates.isDateField(field)
+					? (source.getField(field, true, true) || "")
+					: (source.toJSON()[field] || "");
 			}
 			else if (typeof choice === "string") {
-				overrides[field] = choice;
+				overrides[field] = ZoteroMCP.Dates.isDateField(field)
+					? ZoteroMCP.Dates.forDateField(field, choice).value
+					: choice;
 			}
 			else {
 				errors.push(`fields.${field} must be a string or {"from": "<item key>"}`);
@@ -133,12 +145,12 @@ ZoteroMCP.Destructive = (function () {
 			differing[field] = {
 				master: masterJSON[field] !== undefined ? masterJSON[field] : "",
 				alternatives: values,
-				result: field in overrides ? overrides[field] : (masterJSON[field] !== undefined ? masterJSON[field] : "")
+				result: field in overrides ? shown(field, overrides[field]) : (masterJSON[field] !== undefined ? masterJSON[field] : "")
 			};
 		}
 		for (const [field, value] of Object.entries(overrides)) {
 			if (!(field in differing)) {
-				differing[field] = { master: masterJSON[field] || "", alternatives: [], result: value };
+				differing[field] = { master: masterJSON[field] || "", alternatives: [], result: shown(field, value) };
 			}
 		}
 
@@ -178,9 +190,21 @@ ZoteroMCP.Destructive = (function () {
 				const { master, others, overrides } = mergePlan(a);
 				const before = master.toJSON();
 				if (Object.keys(overrides).length) {
+					// fromJSON() re-parses date text in the app language (en-US reads 05/03 as
+					// 3 May), so date fields are set afterwards in their internal form
+					const dateValues = {};
+					for (const fieldID of Zotero.ItemFields.getItemTypeFields(master.itemTypeID)) {
+						if (Zotero.ItemFields.isDate(fieldID)) {
+							const name = Zotero.ItemFields.getName(fieldID);
+							dateValues[name] = name in overrides ? overrides[name] : master.getField(name, true, true);
+						}
+					}
 					const json = master.toJSON();
 					Object.assign(json, overrides);
 					master.fromJSON(json);
+					for (const [name, value] of Object.entries(dateValues)) {
+						master.setField(name, value || "");
+					}
 				}
 				const { mergeItems: zoteroMerge } = ChromeUtils.importESModule("chrome://zotero/content/mergeItems.mjs");
 				await zoteroMerge(master, others);

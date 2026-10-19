@@ -8,6 +8,7 @@ const MODULES = [
 	"audit.js",
 	"confirm.js",
 	"bbt.js",
+	"dates.js",
 	"edit.js",
 	"lookup.js",
 	"destructive.js",

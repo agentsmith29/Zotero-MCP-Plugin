@@ -10,6 +10,9 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+
 env:
   ZOTERO_VERSION: "10.0.6"
   BBT_VERSION: "9.0.71"
@@ -52,15 +55,59 @@ jobs:
     name: Build XPI
     needs: test
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
 
+      # Major and minor come from manifest.json, the patch number is the CI run number
+      - name: Version
+        id: version
+        run: |
+          base=$(python3 -c "import json; print('.'.join(json.load(open('manifest.json'))['version'].split('.')[:2]))")
+          echo "version=${base}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
       - name: Build
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_URL: https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}
         run: scripts/build-xpi.sh
 
       - name: Upload XPI
         uses: actions/upload-artifact@v7
         with:
           name: zotero-mcp-xpi
-          path: dist/zotero-mcp.xpi
+          path: |
+            dist/zotero-mcp.xpi
+            dist/updates.json
           if-no-files-found: error
+
+  # Zotero checks releases/latest/download/updates.json (manifest update_url), so every
+  # release published here is offered as an update to installed copies
+  release:
+    name: Tag and release
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: zotero-mcp-xpi
+          path: dist
+
+      - name: Create tag and GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          gh release create "v${VERSION}" dist/zotero-mcp.xpi dist/updates.json \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "Zotero MCP ${VERSION}" \
+            --generate-notes \
+            --latest

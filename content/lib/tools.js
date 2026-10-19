@@ -177,7 +177,7 @@ ZoteroMCP.Tools = (function () {
 			name: "create_item",
 			group: "write",
 			title: "Create item",
-			description: "Create an item manually. If an item with the same DOI, ISBN or arXiv ID (from fields, incl. Extra and URL) exists, nothing is created: the existing item is filed into the collections and returned. duplicate_force: true creates a new item anyway.",
+			description: "Create an item manually. If the work is already in the library (same DOI, ISBN, arXiv ID or PMID from the fields incl. Extra and URL, or same title, first author and year), nothing is created: the existing item is filed into the collections and returned. duplicate_force: true creates a new item anyway. Dates are stored as DD/MM/YYYY (MM/YYYY or YYYY if partial); send ISO dates (YYYY-MM-DD) to avoid day/month mix-ups. The result lists how each rewritten date was read.",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -197,7 +197,7 @@ ZoteroMCP.Tools = (function () {
 			name: "add_by_identifier",
 			group: "write",
 			title: "Add by identifier",
-			description: "Zotero's magic wand: look up DOIs, ISBNs, PMIDs or arXiv IDs online and create items (with available attachments). Existing items with the same identifier are only filed into the collections unless duplicate_force is true. Can take several seconds per identifier.",
+			description: "Zotero's magic wand: look up DOIs, ISBNs, PMIDs or arXiv IDs online and create items (with available attachments). If the work is already in the library, matched before or after the lookup (by any identifier of the found record, or by title, first author and year), no copy is kept: the existing item is filed into the collections and receives a downloaded PDF/EPUB it lacked. duplicate_force: true keeps new copies. Dates of new items are stored as DD/MM/YYYY. Can take several seconds per identifier.",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -215,7 +215,7 @@ ZoteroMCP.Tools = (function () {
 			name: "update_item",
 			group: "write",
 			title: "Update item",
-			description: "Edit fields, creators (replaces the list), tags or item type. The citation key stays unchanged unless regenerate_citekey is true; then old and new key are reported.",
+			description: "Edit fields, creators (replaces the list), tags or item type. The citation key stays unchanged unless regenerate_citekey is true; then old and new key are reported. Dates are stored as DD/MM/YYYY (MM/YYYY or YYYY if partial); send ISO dates (YYYY-MM-DD) to avoid day/month mix-ups. The result lists how each rewritten date was read.",
 			inputSchema: {
 				type: "object",
 				properties: {

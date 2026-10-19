@@ -8,6 +8,7 @@
 #   TEST_BASE    directory for profile, data and log                  [required]
 #   BBT_XPI      path to a Better BibTeX .xpi to install                [optional]
 #   PLUGIN_XPI   install this built XPI instead of loading the source   [optional]
+#   INSECURE_UPDATES=1  allow http update URLs (update-flow test only)
 #   TEST_PORT    HTTP port (default 23129)
 #   TEST_TOKEN   MCP token (default: test-token-0123456789abcdef)
 set -euo pipefail
@@ -73,6 +74,10 @@ user_pref("extensions.zotero.zoteromcp.token", "$TEST_TOKEN");
 user_pref("extensions.zotero.zoteromcp.notices.bbtMissing", false);
 user_pref("extensions.zotero.zoteromcp.notices.bbtSettings", false);
 PREFS
+	if [[ -n "${INSECURE_UPDATES:-}" ]]; then
+		# Lets the update-flow test use a plain-http stand-in for GitHub releases
+		echo 'user_pref("extensions.checkUpdateSecurity", false);' >> "$PROFILE/user.js"
+	fi
 	# Force a rescan of the extensions directory
 	if [[ -f "$PROFILE/prefs.js" ]]; then
 		sed -i.bak -e '/extensions.lastAppBuildId/d' -e '/extensions.lastAppVersion/d' "$PROFILE/prefs.js"

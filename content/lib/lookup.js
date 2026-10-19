@@ -71,25 +71,89 @@ ZoteroMCP.Lookup = (function () {
 		}
 
 		const created = [];
+		const merged = [];
+		const newIDs = newItems.map(i => i.id);
 		for (const item of newItems) {
+			// The looked-up record may carry identifiers the input did not (e.g. a DOI lookup
+			// returning a book's ISBN), or match an existing entry only by title, author and year
+			const others = await Lib.findDuplicates(item, { excludeIDs: newIDs });
+			if (others.length && !duplicateForce) {
+				merged.push(await absorbIntoExisting(item, others[0], collections));
+				continue;
+			}
+			const dates = ZoteroMCP.Dates.normalizeItem(item);
+			if (item.hasChanged()) {
+				await item.saveTx();
+			}
 			const citekey = await ZoteroMCP.Edit.citekeyAfterBBT(item);
 			const summary = Object.assign(Lib.itemSummary(item), { citekey: citekey || undefined });
-			// The looked-up record may carry an identifier the input did not (e.g. arXiv -> DOI)
-			const others = await Lib.findByIdentifiers(Lib.identifiersOf(item), { excludeIDs: newItems.map(i => i.id) });
+			if (dates.length) {
+				summary.dates = dates;
+			}
 			if (others.length) {
 				summary.possible_duplicates = others.map(m => ({ key: m.item.key, matched_by: m.matchedBy }));
 			}
 			created.push(summary);
 		}
+		if (!created.length) {
+			const first = merged[0];
+			return {
+				identifier: label,
+				status: "existing",
+				matched_by: first.matched_by,
+				item: first.item,
+				added_to_collections: first.added_to_collections,
+				discarded_copy: first.discarded_copy,
+				moved_attachments: first.moved_attachments.length ? first.moved_attachments : undefined,
+				note: "The lookup returned a work that is already in the library; the looked-up copy was discarded."
+			};
+		}
 		return {
 			identifier: label,
 			status: "created",
 			items: created,
+			matched_existing: merged.length ? merged : undefined,
 			duplicates_ignored: existing.length ? existing.map(m => m.item.key) : undefined
 		};
 	}
 
-	async function addByIdentifier(args) {
+	/**
+	 * A freshly looked-up item turned out to be a work already in the library: keep the
+	 * existing item, give it any file type it lacks, file it into the collections, and erase
+	 * the new copy (created moments ago by this call, so nothing of the user's is lost).
+	 */
+	async function absorbIntoExisting(newItem, match, collections) {
+		const existing = match.item;
+		const haveTypes = new Set(Zotero.Items.get(existing.getAttachments(false))
+			.filter(a => Lib.isStoredFile(a)).map(a => a.attachmentContentType));
+		const moved = [];
+		await Zotero.DB.executeTransaction(async () => {
+			for (const attachment of Zotero.Items.get(newItem.getAttachments(false))) {
+				if (Lib.isStoredFile(attachment) && !haveTypes.has(attachment.attachmentContentType)) {
+					haveTypes.add(attachment.attachmentContentType);
+					attachment.parentKey = existing.key;
+					await attachment.save();
+					moved.push(attachment.key);
+				}
+			}
+		});
+		const discarded = newItem.key;
+		await newItem.eraseTx();
+		const added = await ZoteroMCP.Edit.fileIntoCollections(existing, collections);
+		return {
+			matched_by: match.matchedBy,
+			item: Lib.itemSummary(existing),
+			discarded_copy: discarded,
+			added_to_collections: added,
+			moved_attachments: moved
+		};
+	}
+
+	function addByIdentifier(args) {
+		return ZoteroMCP.Edit.insertMutex.run(() => addByIdentifierNow(args));
+	}
+
+	async function addByIdentifierNow(args) {
 		Lib.assertUserLibrary(args);
 		let inputs = args.identifiers;
 		if (typeof inputs === "string") {
@@ -114,8 +178,15 @@ ZoteroMCP.Lookup = (function () {
 		}
 		const created = results.filter(r => r.status === "created").flatMap(r => r.items.map(i => i.key));
 		const filed = results.filter(r => r.status === "existing").map(r => r.item.key);
+		const absorbed = results.flatMap(r => (r.status === "existing" && r.discarded_copy ? [r] : (r.matched_existing || []))
+			.map(m => ({ existing: m.item.key, discarded_copy: m.discarded_copy, moved_attachments: m.moved_attachments })));
 		if (created.length || filed.length) {
-			await Audit.record("add_by_identifier", { created, filed_existing: filed, collections: collections.map(c => c.key) });
+			await Audit.record("add_by_identifier", {
+				created,
+				filed_existing: filed,
+				discarded_duplicates: absorbed.length ? absorbed : undefined,
+				collections: collections.map(c => c.key)
+			});
 		}
 		return {
 			summary: {

@@ -356,7 +356,8 @@ ZoteroMCP.Lib = (function () {
 		const extra = get("extra");
 		const ids = { doi: new Set(), isbn: new Set(), arxiv: new Set(), pmid: new Set() };
 
-		for (const value of [get("DOI"), ...extraLines(extra, "DOI")]) {
+		const urlDOI = /^https?:\/\/(?:dx\.)?doi\.org\/(.+)$/i.exec(get("url"));
+		for (const value of [get("DOI"), ...extraLines(extra, "DOI"), urlDOI ? decodeURIComponent(urlDOI[1]) : ""]) {
 			const doi = normalizeDOI(value);
 			if (doi) {
 				ids.doi.add(doi);
@@ -427,6 +428,113 @@ ZoteroMCP.Lib = (function () {
 				matches.push({ item, matchedBy });
 			}
 		}
+		return matches;
+	}
+
+	// Lower-case title without diacritics, punctuation and markup, for comparisons
+	function normalizeTitle(title) {
+		return String(title || "")
+			.normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+			.replace(/<[^>]+>/g, " ")
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, " ")
+			.trim();
+	}
+
+	/**
+	 * What duplicate detection compares: identifiers, normalized title, first creator, year
+	 * @param {Zotero.Item|Object} source - an item, or {itemType, fields, creators}
+	 */
+	function fingerprintOf(source) {
+		if (source instanceof Zotero.Item) {
+			const creators = source.getCreators();
+			return {
+				ids: identifiersOf(source),
+				type: source.itemType,
+				title: normalizeTitle(getFieldSafe(source, "title")),
+				creator: creators.length ? normalizeTitle(creators[0].lastName || creators[0].name) : "",
+				year: year(source)
+			};
+		}
+		const fields = source.fields || {};
+		const first = (source.creators || [])[0];
+		let y = null;
+		if (fields.date) {
+			const parsed = ZoteroMCP.Dates.parse(fields.date) || Zotero.Date.strToDate(String(fields.date));
+			y = parsed && parsed.year ? parseInt(parsed.year) : null;
+		}
+		return {
+			ids: identifiersOf(fields),
+			type: source.itemType,
+			title: normalizeTitle(fields.title),
+			creator: first ? normalizeTitle(first.lastName || first.name) : "",
+			year: y
+		};
+	}
+
+	// Same title, and first creator and year agree wherever both sides have them (at least one must)
+	function sameWork(a, b) {
+		if (!a.title || a.title.length < 8 || a.title !== b.title) {
+			return false;
+		}
+		if ((a.type === "bookSection") !== (b.type === "bookSection")) {
+			return false;
+		}
+		// Different DOIs mean different works (e.g. a paper and its erratum)
+		if (a.ids.doi.length && b.ids.doi.length && !a.ids.doi.some(d => b.ids.doi.includes(d))) {
+			return false;
+		}
+		let compared = 0;
+		if (a.creator && b.creator) {
+			if (a.creator !== b.creator) {
+				return false;
+			}
+			compared++;
+		}
+		if (a.year && b.year) {
+			if (a.year !== b.year) {
+				return false;
+			}
+			compared++;
+		}
+		return compared > 0;
+	}
+
+	/**
+	 * Regular, non-trashed items that are the same work: shared DOI, ISBN, arXiv ID or PMID,
+	 * or the same title with matching first creator and year
+	 * @param {Zotero.Item|Object} source - an item, or {itemType, fields, creators}
+	 * @return {Promise<Array<{item: Zotero.Item, matchedBy: String[]}>>}
+	 */
+	async function findDuplicates(source, { excludeIDs = [] } = {}) {
+		const target = fingerprintOf(source);
+		const exclude = new Set(excludeIDs);
+		if (source instanceof Zotero.Item && source.id) {
+			exclude.add(source.id);
+		}
+		const matches = [];
+		for (const item of await getAllTopLevelItems()) {
+			if (!item.isRegularItem() || exclude.has(item.id)) {
+				continue;
+			}
+			const other = fingerprintOf(item);
+			const matchedBy = [];
+			for (const type of ["doi", "isbn", "arxiv", "pmid"]) {
+				const hit = target.ids[type].find(value => other.ids[type].includes(value));
+				if (hit) {
+					matchedBy.push(`${type}:${hit}`);
+				}
+			}
+			if (!matchedBy.length && sameWork(target, other)) {
+				matchedBy.push("title+creator+year");
+			}
+			if (matchedBy.length) {
+				matches.push({ item, matchedBy });
+			}
+		}
+		// Identifier matches first, then the oldest item
+		matches.sort((x, y) => (y.matchedBy[0] !== "title+creator+year") - (x.matchedBy[0] !== "title+creator+year")
+			|| (x.item.dateAdded < y.item.dateAdded ? -1 : 1));
 		return matches;
 	}
 
@@ -660,6 +768,8 @@ ZoteroMCP.Lib = (function () {
 		identifiersOf,
 		hasIdentifiers,
 		findByIdentifiers,
+		findDuplicates,
+		normalizeTitle,
 		itemSummary,
 		itemDetail,
 		searchItems,

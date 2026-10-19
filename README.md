@@ -14,8 +14,10 @@ Scope: My Library only (no group libraries). Better BibTeX is required for bibli
 
 ## Install
 
-1. Build the XPI: `./scripts/build-xpi.sh` → `dist/zotero-mcp.xpi`
+1. Download `zotero-mcp.xpi` from the [latest release](https://github.com/agentsmith29/Zotero-MCP-Plugin/releases/latest) (or build it: `./scripts/build-xpi.sh` → `dist/zotero-mcp.xpi`).
 2. Zotero → Tools → Plugins → gear menu → Install Plugin From File… → choose the XPI.
+
+Installed copies update themselves: Zotero checks `releases/latest/download/updates.json` of this repository like any other plugin update (Tools → Plugins → gear menu → Check for Updates forces a check).
 3. Open Zotero Settings → **Zotero MCP**.
 
 ## Connect Claude Code
@@ -53,7 +55,8 @@ Every tool can be switched off in the settings; `set_bbt_settings` and `sync_lib
 ### Safety model
 
 - **Two-phase tools:** the first call changes nothing and returns a preview plus a `confirmation_id`. Only a second call with the same arguments and that ID executes. The ID is single-use, expires after 5 minutes and is invalidated if the library changes in between.
-- **No duplicates on insert:** `create_item` and `add_by_identifier` look for the DOI, ISBN, arXiv ID (and PMID) first and file the existing item instead; `duplicate_force: true` overrides.
+- **No duplicates on insert:** `create_item` and `add_by_identifier` treat a work as already present when it shares a DOI (also from Extra or a doi.org URL), ISBN, arXiv ID or PMID with an item, or has the same title, first author and year. They then file the existing item instead. The magic wand checks again after the lookup, against every identifier of the found record: a looked-up copy of an existing work is discarded, and a PDF/EPUB it brought along moves to the existing item if that has none. Inserts run one at a time, so parallel calls cannot slip past the check. `duplicate_force: true` overrides.
+- **Dates:** dates written by agents are stored as `DD/MM/YYYY` (`MM/YYYY` or `YYYY` when partial). ISO dates, month names and `YYYYMMDD` are converted; `MM/DD/YYYY` is corrected when it is recognisable (second number above 12), otherwise day-first is assumed and flagged in the result. The plugin stores Zotero's internal `YYYY-MM-DD` part alongside, so sorting, citations and Better BibTeX use the intended day whatever Zotero's language. Text that is not a single date ("Spring 2020") stays as given. Can be switched off in the settings.
 - **Separate verbs:** removing from a collection never deletes; only `trash_items`, `delete_collection` and `merge_items` move things to Zotero's trash. Nothing empties the trash.
 - **Stable citation keys:** edits never touch `citationKey`; `regenerate_citekey` and `set_citekey` report old and new key with a warning about `\cite{}` references. The plugin checks that Better BibTeX's `resetKeyOnChange` is off and offers to fix it, never silently.
 - **Audit log:** every executed write is appended to `zotero-mcp-audit.log` in the Zotero data directory.
@@ -113,6 +116,8 @@ ZOTERO_VERSION=10.0.6 BBT_VERSION=9.0.71 scripts/ci-test-linux.sh
 
 `NO_NETWORK=1` skips the online lookups; `KEEP_RUNNING=1` leaves the test Zotero open; `PLUGIN_XPI=dist/zotero-mcp.xpi` tests the built package instead of the sources. Your own Zotero profile and library are never touched.
 
-### CI
+### CI and releases
 
 `.github/workflows/ci.yml` runs on every push and pull request: the end-to-end suite on `ubuntu-latest` (`scripts/ci-test-linux.sh`), then, only if it passes, the XPI build, uploaded as the `zotero-mcp-xpi` artifact. Online lookup tests are skipped by default because they depend on external services; start the workflow manually with **online** ticked to include them. Zotero and Better BibTeX versions are pinned in the workflow's `env`.
+
+Every push to `main` that passes the tests is released automatically: the build gets version `<major>.<minor>.<CI run number>` (major and minor from `manifest.json`; raise them there for bigger releases), and the workflow creates the tag `v<version>` and a GitHub release with `zotero-mcp.xpi` and `updates.json` (download link and SHA-256 of that XPI). Because `update_url` points at the latest release's `updates.json`, installed copies pick the new version up through Zotero's normal plugin updates.

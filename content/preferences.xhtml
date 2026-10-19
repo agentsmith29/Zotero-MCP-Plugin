@@ -46,6 +46,17 @@
 	</groupbox>
 
 	<groupbox>
+		<label><html:h2>Dates</html:h2></label>
+		<checkbox id="zmcp-dates-normalize" label="Store dates written by agents as DD/MM/YYYY"
+		          preference="extensions.zotero.zoteromcp.dates.normalize" native="true"/>
+		<html:p class="zmcp-hint">
+			Agents send dates in many formats; they are converted to DD/MM/YYYY (MM/YYYY or YYYY when partial), and a
+			recognisable MM/DD/YYYY is corrected. Zotero still sorts and cites the right day, whatever Zotero's language.
+			Dates you type in Zotero yourself are read according to Zotero's language setting.
+		</html:p>
+	</groupbox>
+
+	<groupbox>
 		<label><html:h2>Library tree</html:h2></label>
 		<hbox align="center" class="zmcp-row">
 			<html:label for="zmcp-node-limit">Size limit for get_library_tree (collections + placements + files, 0 = no limit)</html:label>

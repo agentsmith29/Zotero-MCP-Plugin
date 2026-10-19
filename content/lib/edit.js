@@ -21,8 +21,12 @@ ZoteroMCP.Edit = (function () {
 		return Zotero.ItemFields.getItemTypeFields(item.itemTypeID).map(id => Zotero.ItemFields.getName(id));
 	}
 
+	/**
+	 * @return {Object[]} notes on date values that were rewritten (see ZoteroMCP.Dates)
+	 */
 	function applyFields(item, fields) {
 		const errors = [];
+		const dateNotes = [];
 		for (const [field, value] of Object.entries(fields || {})) {
 			if (field === "citationKey") {
 				errors.push("citationKey cannot be set here; use set_citekey (or regenerate_citekey on update_item)");
@@ -34,8 +38,19 @@ ZoteroMCP.Edit = (function () {
 				errors.push(`'${field}' is not a field of ${item.itemType}`);
 				continue;
 			}
+			let text = value === null || value === undefined ? "" : String(value);
+			if (field === "accessDate") {
+				text = ZoteroMCP.Dates.forAccessDate(text);
+			}
+			else if (ZoteroMCP.Dates.isDateField(field)) {
+				const { value: stored, note } = ZoteroMCP.Dates.forDateField(field, text);
+				text = stored;
+				if (note) {
+					dateNotes.push(note);
+				}
+			}
 			try {
-				item.setField(field, value === null || value === undefined ? "" : String(value));
+				item.setField(field, text);
 			}
 			catch (e) {
 				errors.push(`${field}: ${e.message}`);
@@ -44,6 +59,7 @@ ZoteroMCP.Edit = (function () {
 		if (errors.length) {
 			throw new ToolError(errors.join("; "), { valid_fields: validFieldsFor(item) });
 		}
+		return dateNotes;
 	}
 
 	function normalizeCreators(creators) {
@@ -130,14 +146,20 @@ ZoteroMCP.Edit = (function () {
 
 	// ----------------------------------------------------------- item tools
 
-	async function createItem(args) {
+	// Inserts run one at a time, so parallel calls cannot both pass the duplicate check
+	const insertMutex = ZoteroMCP.Util.createMutex();
+
+	function createItem(args) {
+		return insertMutex.run(() => createItemNow(args));
+	}
+
+	async function createItemNow(args) {
 		Lib.assertUserLibrary(args);
 		const typeID = itemTypeID(args.item_type);
 		const fields = Object.assign({}, args.fields || {});
 		const collections = Lib.resolveCollections(args.collections || []);
 
-		const ids = Lib.identifiersOf(fields);
-		const existing = await Lib.findByIdentifiers(ids);
+		const existing = await Lib.findDuplicates({ itemType: args.item_type, fields, creators: args.creators });
 		if (existing.length && !args.duplicate_force) {
 			const { item, matchedBy } = existing[0];
 			const added = await fileIntoCollections(item, collections);
@@ -146,7 +168,7 @@ ZoteroMCP.Edit = (function () {
 			}
 			return {
 				status: "existing",
-				message: "An item with the same identifier already exists; it was filed into the requested collections instead of creating a duplicate. Pass duplicate_force: true to create a new item anyway.",
+				message: "This work is already in the library (same identifier, or same title, first author and year); it was filed into the requested collections instead of creating a duplicate. Pass duplicate_force: true to create a new item anyway.",
 				matched_by: matchedBy,
 				item: Lib.itemSummary(item),
 				added_to_collections: added,
@@ -156,7 +178,7 @@ ZoteroMCP.Edit = (function () {
 
 		const item = new Zotero.Item(typeID);
 		item.libraryID = Lib.libraryID();
-		applyFields(item, fields);
+		const dates = applyFields(item, fields);
 		if (args.creators) {
 			item.setCreators(normalizeCreators(args.creators));
 		}
@@ -172,6 +194,7 @@ ZoteroMCP.Edit = (function () {
 		return {
 			status: "created",
 			item: Object.assign(Lib.itemSummary(item), { citekey: citekey || undefined }),
+			dates: dates.length ? dates : undefined,
 			duplicates_ignored: existing.length ? existing.map(m => ({ key: m.item.key, matched_by: m.matchedBy })) : undefined
 		};
 	}
@@ -188,7 +211,7 @@ ZoteroMCP.Edit = (function () {
 		if (args.item_type && args.item_type !== item.itemType) {
 			item.setType(itemTypeID(args.item_type));
 		}
-		applyFields(item, args.fields);
+		const dates = applyFields(item, args.fields);
 		if (args.creators) {
 			item.setCreators(normalizeCreators(args.creators));
 		}
@@ -207,7 +230,7 @@ ZoteroMCP.Edit = (function () {
 			await item.saveTx();
 		}
 
-		const result = { status: "updated", item: Lib.itemSummary(item) };
+		const result = { status: "updated", item: Lib.itemSummary(item), dates: dates.length ? dates : undefined };
 		const after = snapshot(item);
 		result.changes = diff(before, after);
 
@@ -430,6 +453,7 @@ ZoteroMCP.Edit = (function () {
 		renameCollection,
 		moveCollection,
 		fileIntoCollections,
-		citekeyAfterBBT
+		citekeyAfterBBT,
+		insertMutex
 	};
 })();

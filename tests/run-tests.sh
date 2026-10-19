@@ -27,7 +27,7 @@ fi
 sleep 3
 cd "$HERE"
 status=0
-python3 -W ignore -m unittest -v test_m1_transport test_m2_read test_m3_export test_m4_write test_m5_lookup test_m6_destructive || status=$?
+python3 -W ignore -m unittest -v test_m1_transport test_m2_read test_m3_export test_m4_write test_m5_lookup test_m6_destructive test_m7_dates_duplicates || status=$?
 if [[ -z "${KEEP_RUNNING:-}" ]]; then
 	"$HERE/zotero-test-env.sh" stop
 fi
